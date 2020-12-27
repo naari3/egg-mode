@@ -134,7 +134,7 @@ pub enum Error {
     BadStatus(hyper::StatusCode),
     ///The web request experienced an error. The enclosed error was returned from hyper.
     #[error("Network error: {}", _0)]
-    NetError(#[from] hyper::error::Error),
+    NetError(#[from] hyper::Error),
     ///The `native_tls` implementation returned an error. The enclosed error was returned from
     ///`native_tls`.
     #[cfg(feature = "native_tls")]

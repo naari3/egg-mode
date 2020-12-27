@@ -4,7 +4,7 @@
 use crate::error::Error::{self, *};
 use crate::error::{Result, TwitterErrors};
 
-use hyper::client::ResponseFuture;
+use hyper::client::{HttpConnector, ResponseFuture};
 use hyper::{self, Body, Request};
 #[cfg(feature = "hyper-rustls")]
 use hyper_rustls::HttpsConnector;
@@ -91,7 +91,7 @@ impl<T> Response<T> {
     ///contained `T`.
     pub fn try_map<F, U, E>(src: Response<T>, fun: F) -> std::result::Result<Response<U>, E>
     where
-        F: FnOnce(T) -> std::result::Result<U, E>
+        F: FnOnce(T) -> std::result::Result<U, E>,
     {
         Ok(Response {
             rate_limit_status: src.rate_limit_status,
@@ -123,7 +123,7 @@ impl<T: IntoIterator> IntoIterator for Response<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         ResponseIter {
-            it: Response::map(self, |it| it.into_iter())
+            it: Response::map(self, |it| it.into_iter()),
         }
     }
 }
@@ -151,8 +151,8 @@ impl<T: Iterator> Iterator for ResponseIter<T> {
 // n.b. this function is re-exported in the `raw` module - these docs are public!
 /// Converts the given request into a raw `ResponseFuture` from hyper.
 pub fn get_response(request: Request<Body>) -> ResponseFuture {
-    let connector = HttpsConnector::new();
-    let client = hyper::Client::builder().build(connector);
+    let connector = HttpsConnector::with_webpki_roots();
+    let client = hyper::Client::builder().build::<HttpsConnector<HttpConnector>, Body>(connector);
     client.request(request)
 }
 
@@ -160,8 +160,8 @@ pub fn get_response(request: Request<Body>) -> ResponseFuture {
 /// Loads the given request, parses the headers and response for potential errors given by Twitter,
 /// and returns the headers and raw bytes returned from the response.
 pub async fn raw_request(request: Request<Body>) -> Result<(Headers, Vec<u8>)> {
-    let connector = HttpsConnector::new();
-    let client = hyper::Client::builder().build(connector);
+    let connector = HttpsConnector::with_webpki_roots();
+    let client = hyper::Client::builder().build::<HttpsConnector<HttpConnector>, Body>(connector);
     let resp = client.request(request).await?;
     let (parts, body) = resp.into_parts();
     let body: Vec<_> = hyper::body::to_bytes(body).await?.to_vec();
