@@ -12,6 +12,7 @@ use hyper_rustls::HttpsConnector;
 use hyper_tls::HttpsConnector;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json;
+use tokio_compat_02::FutureExt;
 
 use std::convert::TryFrom;
 
@@ -91,7 +92,7 @@ impl<T> Response<T> {
     ///contained `T`.
     pub fn try_map<F, U, E>(src: Response<T>, fun: F) -> std::result::Result<Response<U>, E>
     where
-        F: FnOnce(T) -> std::result::Result<U, E>
+        F: FnOnce(T) -> std::result::Result<U, E>,
     {
         Ok(Response {
             rate_limit_status: src.rate_limit_status,
@@ -123,7 +124,7 @@ impl<T: IntoIterator> IntoIterator for Response<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         ResponseIter {
-            it: Response::map(self, |it| it.into_iter())
+            it: Response::map(self, |it| it.into_iter()),
         }
     }
 }
@@ -162,7 +163,7 @@ pub fn get_response(request: Request<Body>) -> ResponseFuture {
 pub async fn raw_request(request: Request<Body>) -> Result<(Headers, Vec<u8>)> {
     let connector = HttpsConnector::new();
     let client = hyper::Client::builder().build(connector);
-    let resp = client.request(request).await?;
+    let resp = client.request(request).compat().await?;
     let (parts, body) = resp.into_parts();
     let body: Vec<_> = hyper::body::to_bytes(body).await?.to_vec();
     if let Ok(errors) = serde_json::from_slice::<TwitterErrors>(&body) {
